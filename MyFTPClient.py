@@ -17,8 +17,13 @@ ftp.retrbinary("RETR filename.txt",file_handel,bufsize)  #下载FTP文件
 """
 # -*- encoding:utf-8 -*-
 from ftplib import FTP
-from PyQt5.QtWidgets import QHeaderView, QComboBox, QMessageBox
+from PyQt5.QtWidgets import QHeaderView, QComboBox, QMessageBox, QProgressBar
 import os
+from threading import Thread
+
+
+class MyThread(Thread):
+    pass
 
 
 class FTPClient:
@@ -30,6 +35,15 @@ class FTPClient:
 
     def sendCmd(self, cmd):
         return self.ftp.sendcmd(cmd)
+
+    def MessageBox(self):
+        msg = QMessageBox()
+        msg.setWindowTitle("Warning")
+        msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+        msg.setText("下载完成!")
+        btn = msg.exec_()
+        if btn == QMessageBox.Ok:
+            pass
 
     def size(self, filename):
         resp = self.ftp.sendcmd('SIZE ' + filename)
@@ -44,43 +58,77 @@ class FTPClient:
     def getList(self):
         return self.ftp.nlst()  # retrlines('LIST')
 
-    def download(self, name, path):
+    def download(self, name, path, messageList=None, tableWidgets=None):
+        downFlag = False
+        fsize = self.size(name)
+        progress = QProgressBar()
+        progress.setGeometry(0,0,300, 25)
+        progress.setMaximum(100)
         if os.path.exists(path):
             lsize = os.path.getsize(path)
-            fsize = self.size(name)
             if lsize >= fsize:
                 return
             blocksize = 1024 * 1024
             cmpsize = lsize
             try:
-                # self.ftp.sendcmd('TYPE I')
-                lwrite = open(path, 'ab').write
                 print(name)
-                conn = self.ftp.retrbinary('RETR {}'.format(name), lwrite, lsize)
-                # while True:
-                #     data = conn.recv(blocksize)
-                #     if not data:
-                #         break
-                #     lwrite.write(data)
-                #     cmpsize += len(data)
-                #     print('download process:%.2f%%' % (float(cmpsize) / fsize * 100))
+                conn = self.ftp.transfercmd('RETR ' + name, lsize)
+                lwrite = open(path, 'ab')
+                currentSize = 0.0
+                while True:
+                    data = conn.recv(blocksize)
+                    if not data:
+                        break
+                    lwrite.write(data)
+                    cmpsize += len(data)
+                    # print '\b'*30,'download process:%.2f%%'%(float(cmpsize)/fsize*100),
+                    if (float(cmpsize) / fsize * 100) > (currentSize + 1.0):
+                        currentSize = float(cmpsize) / fsize * 100
+                        info = 'download process:%.2f%%' % (float(cmpsize) / fsize * 100)
+                        # progress.setValue(int(float(cmpsize) / fsize * 100))
+                        messageList.addItem(info)
+                        # tableWidgets.setCellWidget(2, 3, progress)
                 lwrite.close()
-                # self.ftp.voidcmd('NOOP')
-                # self.ftp.voidresp()
-                return True
+                self.ftp.voidcmd('NOOP')
+                self.ftp.voidresp()
+                conn.close()
+                downFlag = True
             except Exception as e:
                 print(e)
-                return False
+                downFlag = False
         else:
             try:
-                f = open(path, 'wb')
-                conn = self.ftp.retrbinary('RETR {}'.format(name), f.write)
-                # conn.close()
-                f.close()
-                return True
+                cmpsize = 0
+                blocksize = 1024 * 1024
+                conn = self.ftp.transfercmd('RETR ' + name, 0)
+                lwrite = open(path, 'wb')
+                currentSize = 0.0
+                while True:
+                    data = conn.recv(blocksize)
+                    if not data:
+                        break
+                    lwrite.write(data)
+                    cmpsize += len(data)
+                    # print '\b'*30,'download process:%.2f%%'%(float(cmpsize)/fsize*100),
+                    if (float(cmpsize) / fsize * 100) > (currentSize + 1.0):
+                        currentSize = float(cmpsize) / fsize * 100
+                        info = 'download process:%.2f%%' % (float(cmpsize) / fsize * 100)
+                        # progress.setValue(int(float(cmpsize) / fsize * 100))
+                        # progress.setValue(int(float(cmpsize) / fsize * 100))
+                        messageList.addItem(info)
+                        # tableWidgets.setCellWidget(2, 3, progress)
+                lwrite.close()
+                self.ftp.voidcmd('NOOP')
+                self.ftp.voidresp()
+                conn.close()
+                downFlag = True
             except Exception as e:
                 print(e)
-                return False
+                downFlag = False
+        if downFlag:
+            messageList.addItem("文件下载完成!")
+            t1 = Thread(target=self.MessageBox, args=())
+            t1.start()
 
     def upload(self, path):
         try:

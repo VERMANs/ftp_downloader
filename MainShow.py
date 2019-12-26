@@ -7,7 +7,10 @@
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QHeaderView, QComboBox, QInputDialog, QHBoxLayout, QCheckBox, QMessageBox, QFileDialog, \
+from PyQt5.QtWidgets import QHeaderView, \
+    QComboBox, QProgressBar, QInputDialog, \
+    QHBoxLayout, QCheckBox, QMessageBox, \
+    QFileDialog, \
     QDirModel, \
     QFileSystemModel, QTreeView, QLineEdit
 from PyQt5.QtCore import Qt
@@ -74,7 +77,7 @@ class Ui_MainWindow(object):
         self.StutasLabel = QtWidgets.QLabel(self.centralwidget)
         self.StutasLabel.setGeometry(QtCore.QRect(970, 10, 25, 25))
         self.StutasLabel.setText("")
-        self.StutasLabel.setPixmap(QtGui.QPixmap("F:/Allimages/network/wait.png"))
+        self.StutasLabel.setPixmap(QtGui.QPixmap(GlobalData.imagesURL + "wait.png"))
         self.StutasLabel.setScaledContents(True)
         self.StutasLabel.setObjectName("StutasLabel")
         self.label_8 = QtWidgets.QLabel(self.centralwidget)
@@ -296,9 +299,11 @@ class Ui_MainWindow(object):
                             self.MessageList.addItem("正在下载...")
                             print(os.path.join(self.baseSavePath, filename))
                             t = threading.Thread(target=self.FTP.download,
-                                                 args=(filename, os.path.join(self.baseSavePath, filename),))
+                                                 args=(filename,
+                                                       os.path.join(self.baseSavePath, filename), self.MessageList,
+                                                       self.tableWidget,))
                             t.start()
-                            self.MessageList.addItem("下载完成...")
+                            # self.MessageList.addItem("下载完成...")
                         else:
                             self.MessageList.addItem("正在下载...")
                             s = filename.split('/')
@@ -308,9 +313,11 @@ class Ui_MainWindow(object):
                             if not os.path.exists(os.path.join(self.baseSavePath, s[0])):
                                 os.mkdir(os.path.join(self.baseSavePath, s[0]))
                             t = threading.Thread(target=self.FTP.download,
-                                                 args=(s[1], os.path.join(self.baseSavePath, filename),))
+                                                 args=(
+                                                 s[1], os.path.join(self.baseSavePath, filename), self.MessageList,
+                                                 self.tableWidget,))
                             t.start()
-                            self.MessageList.addItem("下载完成...")
+                            # self.MessageList.addItem("下载完成...")
 
             except Exception as e:
                 print(e)
@@ -328,6 +335,9 @@ class Ui_MainWindow(object):
                 self.file_length = len(files)
                 for f in files:
                     ck = QCheckBox()
+                    progress = QProgressBar()
+                    progress.setGeometry(0, 0, 300, 25)
+                    progress.setMaximum(100)
                     # self.ck.stateChanged.connect(self.changeCk)
                     h = QHBoxLayout()
                     h.setAlignment(Qt.AlignCenter)
@@ -344,17 +354,22 @@ class Ui_MainWindow(object):
                     if os.path.exists(os.path.join(self.baseSavePath, filename)):
                         if os.path.getsize(os.path.join(self.baseSavePath, filename)) >= f[1]:
                             textbox1.setText("已下载")
+                            progress.setValue(100)
                         else:
                             print(os.path.join(self.baseSavePath, filename))
+                            progress.setValue(
+                                int(float(
+                                    os.path.getsize(os.path.join(self.baseSavePath, filename)) / int(f[1])) * 100))
                             textbox1.setText("下载中，可断点重传")
                     else:
                         textbox1.setText("未下载")
-                    textbox2 = QLineEdit()
-                    textbox2.setText("zero")
+                        progress.setValue(0)
+                    # textbox2 = QLineEdit()
+                    # textbox2.setText("zero")
                     textbox3 = QLineEdit()
                     textbox3.setText(str(f[1]))
                     self.tableWidget.setCellWidget(i, 2, textbox1)
-                    self.tableWidget.setCellWidget(i, 3, textbox2)
+                    self.tableWidget.setCellWidget(i, 3, progress)
                     self.tableWidget.setCellWidget(i, 4, textbox3)
                     i += 1
                     item = QtWidgets.QTableWidgetItem()
@@ -369,26 +384,6 @@ class Ui_MainWindow(object):
                 btn = msg.exec()
         except Exception as e:
             print(e)
-
-    def showToast(self):
-        while self.back is None:
-            pass
-        if self.back:
-            msg = QMessageBox()
-            msg.setWindowTitle("Warning")
-            msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
-            msg.setText("上传完成!")
-            btn = msg.exec()
-            if btn == QMessageBox.Ok:
-                pass
-        else:
-            msg = QMessageBox()
-            msg.setWindowTitle("Warning")
-            msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
-            msg.setText("上传失败!")
-            btn = msg.exec()
-            if btn == QMessageBox.Ok:
-                pass
 
     def uploadFile_(self, fileName):
         back = self.FTP.upload(fileName)
@@ -419,10 +414,10 @@ class Ui_MainWindow(object):
         port = self.PortText.toPlainText()
         try:
             self.FTP = FTPClient(host=host)
-            self.StutasLabel.setPixmap(QtGui.QPixmap("F:/Allimages/network/ok.png"))
+            self.StutasLabel.setPixmap(QtGui.QPixmap(GlobalData.imagesURL + "ok.png"))
             self.ServerFilePath.setPlainText("FTP:{}".format(host))
         except Exception as e:
-            self.StutasLabel.setPixmap(QtGui.QPixmap("F:/Allimages/network/wrong.png"))
+            self.StutasLabel.setPixmap(QtGui.QPixmap(GlobalData.imagesURL + "wrong.png"))
             print(e)
             self.FTP = None
         self.getRemoteList()
@@ -444,6 +439,7 @@ class Ui_MainWindow(object):
             t.start()
         else:
             pass
+        self.MessageList.addItem("文件上传成功！")
 
     def ChooseFunction(self):
         col = self.tableWidget.currentColumn()

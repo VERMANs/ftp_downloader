@@ -10,3 +10,4 @@ class GlobalData:
     port = "21"
     username = "admin"
     password = "admin"
+    imagesURL = r"F:\Allimages\network\ftp_files"
